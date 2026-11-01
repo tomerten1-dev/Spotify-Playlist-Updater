@@ -4,11 +4,33 @@
 // short_term  = בערך 4 שבועות אחרונים
 // medium_term = בערך 6 חודשים אחרונים
 // long_term   = בערך שנה אחרונה
+// count = כמה שירים לשים בפלייליסט (המקסימום שספוטיפיי מאפשרת הוא 99)
 const PLAYLISTS = [
-  { name: 'Top Songs - All Time',   range: 'long_term' },
-  { name: 'Top Songs - This Year',  range: 'medium_term' },
-  { name: 'Top Songs - This Month', range: 'short_term' },
+  { name: 'Top Songs - All Time',   range: 'long_term',   count: 99 },
+  { name: 'Top Songs - This Year',  range: 'medium_term', count: 50 },
+  { name: 'Top Songs - This Month', range: 'short_term',  count: 50 },
 ];
+
+// מביא את השירים הכי מושמעים שלך בטווח זמן מסוים.
+// ספוטיפיי נותנת עד 50 שירים בכל בקשה, ולא מאפשרת להגיע מעבר למקום ה-99.
+// לכן: בקשה ראשונה = מקומות 1-50, בקשה שנייה (offset=49) = מקומות 50-99.
+async function getTopTracks(token, range, count) {
+  const first = await spotify(
+    token, 'GET', '/me/top/tracks?time_range=' + range + '&limit=50&offset=0'
+  );
+  let tracks = first.items;
+
+  if (count > 50) {
+    const second = await spotify(
+      token, 'GET', '/me/top/tracks?time_range=' + range + '&limit=50&offset=49'
+    );
+    tracks = tracks.concat(second.items);
+  }
+
+  // new Set מסיר כפילויות (השיר במקום 50 מגיע בשתי הבקשות)
+  const uris = [...new Set(tracks.map((t) => t.uri))];
+  return uris.slice(0, count); // חותכים למספר המבוקש
+}
 
 // שלב א': מקבלים "טוקן גישה" טרי בעזרת טוקן הרענון.
 // טוקן גישה תקף רק לשעה, לכן מבקשים חדש בכל ריצה.
@@ -95,11 +117,8 @@ module.exports = async (req, res) => {
     const results = [];
 
     for (const p of PLAYLISTS) {
-      // 50 השירים הכי מושמעים שלך בטווח הזמן הזה
-      const top = await spotify(
-        token, 'GET', '/me/top/tracks?time_range=' + p.range + '&limit=50'
-      );
-      const uris = top.items.map((t) => t.uri);
+      // השירים הכי מושמעים שלך בטווח הזמן הזה, בכמות שנקבעה למעלה
+      const uris = await getTopTracks(token, p.range, p.count);
 
       const playlistId = await findOrCreatePlaylist(token, me.id, p.name);
 
