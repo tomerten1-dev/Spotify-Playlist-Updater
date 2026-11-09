@@ -125,6 +125,11 @@ module.exports = async (req, res) => {
       // PUT = "תחליף את כל התוכן של הפלייליסט ברשימה הזו"
       // (הכתובת החדשה של ספוטיפיי היא /items ולא /tracks)
       await spotify(token, 'PUT', '/playlists/' + playlistId + '/items', { uris: uris });
+            // כותב בתיאור הפלייליסט מתי הוא עודכן לאחרונה
+      const now = new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
+      await spotify(token, 'PUT', '/playlists/' + playlistId, {
+        description: 'Last update: ' + now,
+      });
 
       results.push({ playlist: p.name, songs: uris.length });
     }
